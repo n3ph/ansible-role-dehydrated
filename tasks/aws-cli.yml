@@ -1,0 +1,31 @@
+---
+
+- tags:
+    - aws-cli
+    - route53
+  when:
+    - dehydrated_challenge_backend == 'route53'
+  block:
+
+    - name: aws-cli | create .aws
+      file:
+        path: "/home/{{ dehydrated_user }}/.aws"
+        state: directory
+
+    - name: aws-cli | create credentials file
+      copy:
+        dest: "/home/{{ dehydrated_user }}/.aws/credentials"
+        owner: "{{ dehydrated_user }}"
+        content: |
+          [{{ dehydrated_aws_profile }}]
+          aws_access_key_id = {{ dehydrated_access_key }}
+          aws_secret_access_key = {{ dehydrated_access_secret }}
+
+    - name: aws-cli | create config file
+      copy:
+        dest: "/home/{{ dehydrated_user }}/.aws/config"
+        owner: "{{ dehydrated_user }}"
+        content: |
+          [profile {{ dehydrated_aws_profile }}]
+          region = eu-central-1
+          output = json

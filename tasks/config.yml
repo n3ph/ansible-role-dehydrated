@@ -1,0 +1,100 @@
+---
+
+- tags: config
+  block:
+
+    #------------------------------------------------------------------------------#
+    # Adjust permissions
+    #------------------------------------------------------------------------------#
+
+    - name: config | adjust permissions
+      file:
+        path: "{{ dehydrated_config_dir }}"
+        owner: "{{ dehydrated_user }}"
+        group: "{{ dehydrated_group }}"
+        recurse: true
+        mode: "o="
+
+    #------------------------------------------------------------------------------#
+    # Install DNS challenge hook
+    #------------------------------------------------------------------------------#
+
+    - when:
+        - dehydrated_challenge_type == 'dns-01'
+        - dehydrated_challenge_backend is defined
+        - dehydrated_challenge_backend is iterable
+      block:
+
+        - name: config | prepare hook config
+          set_fact:
+            dehydrated_hook: "hook-{{ dehydrated_challenge_type }}-{{ dehydrated_challenge_backend }}.py"
+
+        - name: config | create cronjob to update certificates
+          copy:
+            src: "{{ dehydrated_hook }}"
+            dest: "{{ dehydrated_config_dir }}/{{ dehydrated_hook }}"
+            mode: 0750
+
+    #------------------------------------------------------------------------------#
+    # Deploy configuraion files
+    #------------------------------------------------------------------------------#
+
+    - name: config | create configuration directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ dehydrated_user }}"
+        group: "{{ dehydrated_group }}"
+        mode: 0750
+      loop:
+        - "{{ dehydrated_config_dir }}"
+        - "{{ dehydrated_config_dir }}/conf.d"
+
+    - name: config | deploy configuration files
+      template:
+        src: "{{ item }}.j2"
+        dest: "{{ dehydrated_config_dir }}/{{ item }}"
+        owner: "{{ dehydrated_user }}"
+        group: "{{ dehydrated_group }}"
+        mode: 0640
+      with_items:
+        - config
+        - domains.txt
+
+    #------------------------------------------------------------------------------#
+    # Accept the Let's encrypt license and run dehydrated
+    #------------------------------------------------------------------------------#
+
+    - name: config | set up to accept terms automatically
+      shell: "su {{ dehydrated_user }} -c 'dehydrated --register --accept-terms'"
+      changed_when: false
+      when: ansible_virtualization_type != "docker"
+
+    - name: config | initial run
+      vars:
+        sleep: "{{ 120 * ansible_play_hosts.index(inventory_hostname) }}"
+      shell: "su {{ dehydrated_user }} -c 'sleep {{ sleep }} && {{ dehydrated_environment | default(omit) }} dehydrated -c'"
+      when: ansible_virtualization_type != "docker"
+      register: initial_run_result
+      changed_when: false
+      failed_when: initial_run_result.rc != 0
+
+    #------------------------------------------------------------------------------#
+    # Create cronjobs
+    #------------------------------------------------------------------------------#
+
+    - name: config | create cronjob to update certificates
+      vars:
+        host_index: "{{ ansible_play_hosts.index(inventory_hostname) }}"
+      cron:
+        user: "{{ dehydrated_user }}"
+        name: dehydrated - update certificates
+        hour: 4
+        minute: "{{ 60 // ansible_play_hosts | length * ansible_play_hosts.index(inventory_hostname) }}"
+        day: "*"
+        # month: "*/3"
+        month: "*"
+        dow: 0
+        job: "{{ dehydrated_environment | default(omit) }} dehydrated -c && sudo {{ dehydrated_nginx_reload_cmd }}"
+      when: ansible_virtualization_type != "docker"
+      tags: cron

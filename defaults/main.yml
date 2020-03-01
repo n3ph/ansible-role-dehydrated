@@ -1,0 +1,29 @@
+---
+
+dehydrated_user: dehydrated
+dehydrated_group: dehydrated
+dehydrated_nginx_reload_cmd: /bin/systemctl reload nginx
+
+dehydrated_config_dir: /etc/dehydrated
+dehydrated_wellknown_dir: /srv/www/dehydrated
+
+dehydrated_algorithm: rsa
+dehydrated_keysize: 4096
+
+dehydrated_retention_days: 30
+dehydrated_contact_email: noreply@example.com
+
+dehydrated_cleanup: true
+dehydrated_rollover: true
+
+dehydrated_certificates: []
+
+dehydrated_dist_user: dehydrated-dist
+dehydrated_dist_nginx_reload_cmd: /bin/systemctl reload nginx
+
+dehydrated_challenge_type: http-01
+dehydrated_challenge_backend: lighttpd
+
+dehydrated_distrubution: false
+
+dehydrated_stage: true

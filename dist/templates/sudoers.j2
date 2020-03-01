@@ -1,0 +1,11 @@
+# vim: ft=sudoers:
+
+# change certificate owner
+{{ dehydrated_dist_user }} ALL = (root) NOPASSWD: /bin/chown {{ dehydrated_dist_user }} {{ dehydrated_dist_key_path }}
+{{ dehydrated_dist_user }} ALL = (root) NOPASSWD: /bin/chown {{ dehydrated_dist_user }} {{ dehydrated_dist_crt_path }}
+
+{{ dehydrated_dist_user }} ALL = (root) NOPASSWD: /bin/chown root\:root {{ dehydrated_dist_key_path }}
+{{ dehydrated_dist_user }} ALL = (root) NOPASSWD: /bin/chown root\:root {{ dehydrated_dist_crt_path }}
+
+# reload nginx
+{{ dehydrated_dist_user }} ALL = (root) NOPASSWD: {{ dehydrated_dist_nginx_reload_cmd }}

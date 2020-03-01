@@ -1,0 +1,4 @@
+{% for cert in dehydrated_certificates %}
+{{ cert.domains | join(' ') }}
+{% endfor %}
+

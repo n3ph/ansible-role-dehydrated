@@ -1,0 +1,7 @@
+---
+
+- name: lighttpd | restart
+  systemd:
+    name: lighttpd
+    state: restarted
+  when: ansible_virtualization_type != "docker"

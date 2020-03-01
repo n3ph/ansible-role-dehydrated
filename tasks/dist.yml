@@ -1,0 +1,39 @@
+---
+
+- tags: dist
+  when:
+    - dehydrated_distrubution
+  block:
+
+    #------------------------------------------------------------------------------#
+    # Deploy distribution tooling
+    #------------------------------------------------------------------------------#
+
+    - name: dist | generate '/home/{{ dehydrated_user }}/.ssh/known_hosts'
+      template:
+        src: known_hosts.j2
+        dest: /home/{{ dehydrated_user }}/.ssh/known_hosts
+        owner: "{{ dehydrated_user }}"
+        group: "{{ dehydrated_group }}"
+        mode: 0600
+
+    - name: dist | create distribution script
+      template:
+        src: dist_certs.sh.j2
+        dest: /home/{{ dehydrated_user }}/dist_certs.sh
+        owner: "{{ dehydrated_user }}"
+        group: "{{ dehydrated_group }}"
+        mode: 0755
+
+    - name: dist | create cronjob to distribute certificates
+      cron:
+        user: "{{ dehydrated_user }}"
+        name: dehydrated - distribute certificates
+        hour: 5
+        minute: 23
+        day: "*"
+        # month: "*/3"
+        month: "*"
+        dow: 0
+        job: /home/{{ dehydrated_user }}/dist_certs.sh
+      when: ansible_virtualization_type != "docker"

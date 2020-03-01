@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# enable strict mode
+set -euo pipefail
+
+error() {
+    echo "ERROR: $*" >&2
+}
+
+{% for host in groups.dist %}
+
+#### {{ host }} ####
+
+connect={{ dehydrated_dist_user }}@{{ host }}
+
+key_src={{ dehydrated_config_dir }}/certs/{{ host }}/privkey.pem
+key_dst={{ hostvars[host].dehydrated_dist_key_path }}
+
+crt_src={{ dehydrated_config_dir }}/certs/{{ host }}/fullchain.pem
+crt_dst={{ hostvars[host].dehydrated_dist_crt_path }}
+
+ssh -q $connect "
+    sudo /bin/chown {{ dehydrated_dist_user }} $key_dst
+    sudo /bin/chown {{ dehydrated_dist_user }} $crt_dst
+" \
+    || error "Could not change certificate ownership"
+
+scp -q $key_src $connect:$key_dst \
+    || error "Could not copy '$key_src' to '$connect:$key_dst'"
+
+scp -q $crt_src $connect:$crt_dst \
+    || error "Could not copy '$key_src' to '$connect:$key_dst'"
+
+ssh -q $connect "
+    sudo /bin/chown root:root $key_dst
+    sudo /bin/chown root:root $crt_dst
+" \
+    || error "Could not change certificate ownership"
+
+ssh -q $connect 'sudo {{ hostvars[host].dehydrated_dist_nginx_reload_cmd|default(dehydrated_dist_nginx_reload_cmd) }}' \
+    || error "Could not reload nginx"
+{% endfor %}

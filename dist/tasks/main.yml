@@ -1,0 +1,53 @@
+---
+
+#------------------------------------------------------------------------------#
+# Create user
+#------------------------------------------------------------------------------#
+
+- name: create group
+  group:
+    name: "{{ dehydrated_dist_user }}"
+
+- name: create user
+  user:
+    name: "{{ dehydrated_dist_user }}"
+    group: "{{ dehydrated_dist_user }}"
+
+#------------------------------------------------------------------------------#
+# Register ssh pubkey
+#------------------------------------------------------------------------------#
+
+# - name: register dehydrated user public key in authorized keys
+#   authorized_key:
+#     user: "{{ dehydrated_dist_user }}"
+#     key: "{{ hostvars[groups.proxy.0].dehydrated_user_data.ssh_public_key }}"
+#     exclusive: true
+
+#------------------------------------------------------------------------------#
+# Add ACL for user
+#------------------------------------------------------------------------------#
+
+- name: add ACLs for user to certificate directories
+  acl:
+    path: "{{ item }}"
+    entity: "{{ dehydrated_dist_user }}"
+    etype: user
+    permissions: rwx
+    state: present
+  loop:
+    - "{{ dehydrated_dist_crt_path | dirname }}"
+    - "{{ dehydrated_dist_key_path | dirname }}"
+
+#------------------------------------------------------------------------------#
+# Add sudo permissions
+#------------------------------------------------------------------------------#
+
+- name: render sudoers template for user
+  template:
+    src: sudoers.j2
+    dest: /etc/sudoers.d/{{ dehydrated_dist_user }}
+    owner: root
+    group: root
+    mode: 440
+    validate: /usr/sbin/visudo -cf %s
+  tags: sudoers

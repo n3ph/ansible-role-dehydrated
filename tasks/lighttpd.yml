@@ -1,0 +1,92 @@
+---
+
+#------------------------------------------------------------------------------#
+# HTTP Challenge with lighttpd
+#------------------------------------------------------------------------------#
+
+- tags: lighttpd
+  when:
+    - dehydrated_challenge_type == 'http-01'
+    - dehydrated_challenge_backend == 'lighttpd'
+  block:
+
+    #------------------------------------------------------------------------------#
+    # Install packages
+    #------------------------------------------------------------------------------#
+
+    - name: lighttpd | install package
+      yum:
+        name: lighttpd
+        state: present
+
+    #------------------------------------------------------------------------------#
+    # Set permissions on the challenge response directory
+    #------------------------------------------------------------------------------#
+
+    - name: install | adjust permissions for lighttpd
+      file:
+        path: "{{ dehydrated_wellknown_dir }}"
+        state: directory
+        mode: "2770"
+        recurse: true
+        owner: "{{ dehydrated_user }}"
+        group: lighttpd
+
+    #------------------------------------------------------------------------------#
+    # Deploy configurations
+    #------------------------------------------------------------------------------#
+
+    - name: lighttpd | set redirect to https
+      blockinfile:
+        dest: /etc/lighttpd/conf.d/redirect.conf
+        block: |
+          server.modules += ( "mod_setenv" )
+          setenv.add-response-header = ( "Strict-Transport-Security" => "max-age=63072000; includeSubdomains" )
+          server.modules += ( "mod_redirect" )
+          $HTTP["scheme"] == "http" {
+              $HTTP["host"] =~ ".*" {
+                  url.redirect = (
+                      "^/(?!.well-known/acme-challenge.*).*" => "https://%0$0"
+                  )
+              }
+          }
+        marker: "## {mark} ANSIBLE MANAGED BLOCK"
+        create: true
+      notify: lighttpd | restart
+
+    - name: lighttpd | add http vhost for dehydrated
+      blockinfile:
+        dest: /etc/lighttpd/conf.d/dehydrated.conf
+        block: |
+          server.modules += ( "mod_alias" )
+          alias.url += (
+            "/.well-known/acme-challenge" => "{{ dehydrated_wellknown_dir }}"
+          )
+        create: true
+        marker: "## {mark} ANSIBLE MANAGED BLOCK"
+      notify: lighttpd | restart
+
+    #------------------------------------------------------------------------------#
+    # Activate configurations
+    #------------------------------------------------------------------------------#
+
+    - name: lighttpd | activate modules
+      blockinfile:
+        dest: /etc/lighttpd/modules.conf
+        block: "include \"conf.d/{{ item }}.conf\""
+        marker: "## {mark} {{ item }} ANSIBLE MANAGED BLOCK"
+      loop:
+        - dehydrated
+        - redirect
+      notify: lighttpd | restart
+
+    #------------------------------------------------------------------------------#
+    # Enable and start the systemd unit
+    #------------------------------------------------------------------------------#
+
+    - name: lighttpd | enable and start systemd unit
+      systemd:
+        name: lighttpd
+        state: started
+        enabled: true
+      when: ansible_virtualization_type != "docker"

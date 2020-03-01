@@ -1,0 +1,59 @@
+---
+
+- tags: install
+  block:
+    #------------------------------------------------------------------------------#
+    # Install packages
+    #------------------------------------------------------------------------------#
+
+    - name: install | install package
+      yum:
+        name: "{{ item }}"
+        state: installed
+      loop:
+        - "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm"
+        - python3
+        - python3-pip
+        - dehydrated
+
+    - name: install | install python modules
+      pip:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - boto3
+        - tldextract
+
+    #------------------------------------------------------------------------------#
+    # Create group and user
+    #------------------------------------------------------------------------------#
+
+    - name: install | create group
+      group:
+        name: "{{ dehydrated_group }}"
+      tags: dist
+
+    - name: install | create user
+      user:
+        name: "{{ dehydrated_user }}"
+        group: "{{ dehydrated_group }}"
+        shell: /bin/bash
+        generate_ssh_key: true
+      register: dehydrated_user_data
+      tags: dist
+
+    - name: install | ensure /etc/sudoers.d is in place
+      file:
+        path: /etc/sudoers.d
+        state: directory
+      tags: sudoers
+
+    - name: install | render sudoers template for user
+      template:
+        src: sudoers.j2
+        dest: /etc/sudoers.d/{{ dehydrated_user }}
+        owner: root
+        group: root
+        mode: "440"
+        validate: /usr/sbin/visudo -cf %s
+      tags: sudoers
